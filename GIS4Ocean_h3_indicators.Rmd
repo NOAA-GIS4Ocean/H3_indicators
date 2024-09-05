@@ -130,10 +130,18 @@ Also, tell me how long it took to do this.
 ```{r}
 ptm <- proc.time()
 
-RES <- 5
+RES <- 1
 grid_dec <- h3_indicators(occ_in_poly, resolution=RES)
 
 proc.time() - ptm
+
+# RES 1
+#   user  system elapsed 
+#  22.32    0.06   22.45 
+
+# RES 2
+#   user  system elapsed 
+#  34.60    0.11   34.78 
 
 # RES 3
 #    user  system elapsed 
