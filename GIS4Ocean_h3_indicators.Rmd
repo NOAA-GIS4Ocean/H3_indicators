@@ -1,0 +1,163 @@
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(obisindicators)
+library(dplyr)
+library(h3)
+library(sf)
+library(arrow)
+library(magick)
+library(ggplot2)
+```
+
+
+## Create function to make grid, calculate metrics for different resolution grid sizes
+
+```{r function}
+h3_indicators <- function(occ, resolution = 9) {
+  ## Compute the indicator on the grid resolution of interest for the points in the identified polygons
+  # return h3 cell index for occurrences in polygon
+  occ_h3 <- occ %>%
+    mutate(cell = h3::geo_to_h3(data.frame(decimalLatitude, decimalLongitude), res = RES))
+  
+  # group by cell index and compute indicators
+  idx <- obisindicators::calc_indicators(occ_h3)
+  
+  # convert hexagon ids to spatial features
+  # NOTE: DATELINEOFFSET is inv proportional to hex_res b/c we need to look
+  #       further from the dateline as hex sizes get bigger.
+  dl_offset <- 60  # 60 is enough for hex_res >= 1. res 0 is weird; don't use it.
+  hex_sf <- purrr::map_df(idx$cell, h3::h3_to_geo_boundary_sf) %>%
+    sf::st_wrap_dateline(c(
+      "WRAPDATELINE=YES",
+      glue::glue("DATELINEOFFSET={dl_offset}")
+    )) %>%
+    dplyr::mutate(hexid = idx$cell)
+  
+  # merge geometry into indicator table
+  grid <- hex_sf %>%
+    inner_join(idx, by = c("hexid" = "cell"))
+  
+  return(grid)
+}
+```
+
+# Lets do some work!
+
+## Get the OBIS records
+```{r }
+# get OBIS records
+
+# obis_20230208.parquet downloaded from https://obis.org/data/access on 2023-02-08
+#   NOTE: .gitignore prevents this large file from being on Github
+
+open_parquet_file <- function(filepath){
+  occ_all <- arrow::open_dataset(filepath)
+  # NOTE: there are lots of other fields in the parquet file.
+  #     These could be used in the future.
+  occ <- occ_all %>%
+    group_by(
+      decimalLongitude, decimalLatitude, species, date_year) %>%  # remove duplicate rows
+    filter(!is.na(species))  %>%
+    summarize(
+      records = n(),
+      .groups = "drop") %>%
+    collect()
+  # return occ  #I'm not sure what this line is supposed to be doing
+}
+
+
+occ <- open_parquet_file("../obis_20230208.parquet")
+    
+```
+
+# Identify US waters
+```{r}
+
+path <- "data/US_Waters_2024_WGS84/US_Waters_2024_WGS84.shp"
+tt <- read_sf(path) %>%
+  st_transform(27572)
+ggplot() +
+  geom_sf(data=tt)
+```
+## Subset to generic "u.s. waters" box ti reduce amount of processing for next step 
+If needed, reduce by date range too.
+
+```{r}
+# 
+# date_beg <- 1970
+# date_end <- date_beg+1
+# 
+occ_box <- occ %>%
+  filter(between(decimalLatitude,0.00,74.7)) %>%
+  filter(between(decimalLongitude,-180.0,-40.0) | between(decimalLongitude,160.0,180.0))  
+# %>%
+#   filter(
+#       date_year >= date_beg,
+#       date_year <= date_end)
+# occ_box <- occ
+```
+
+
+## Subset OBIS to US Waters
+Take all of the points and only return points that exist in the polygons of interest.
+
+```{r}
+occ_sf <- sf::st_as_sf(occ_box,
+                       coords = c("decimalLongitude", "decimalLatitude"),
+                       crs = 4326) %>%
+  st_transform(27572)
+
+
+# test each point in each polygon (# pts by # polygons) TRUE = point is in polygon
+logi_point_in_pol <- as.data.frame(sf::st_intersects(occ_sf, tt, sparse = FALSE))
+
+
+vect <- logi_point_in_pol %>%
+  mutate(anyTRUE = if_any(.cols = contains('V')))
+
+occ_in_poly <- occ_box[as.vector(vect$anyTRUE), ]
+```
+
+## Create the indicators on h3 grids at specified resolution and return a dataframe
+Also, tell me how long it took to do this.
+
+```{r}
+ptm <- proc.time()
+
+RES <- 5
+grid_dec <- h3_indicators(occ_in_poly, resolution=RES)
+
+proc.time() - ptm
+
+# RES 3
+#    user  system elapsed 
+#  123.09    0.77  126.94 
+
+# RES 4
+#   user  system elapsed 
+# 176.58    0.29  178.22
+
+# RES 5
+#    user  system elapsed 
+#  337.44    0.35  341.98
+
+# RES 6
+#    user  system elapsed 
+# 1139.92    3.69 1200.70 
+```
+
+# Write the data to geojson file
+```{r}
+geojson_string <- geojsonsf::sf_geojson(grid_dec)
+
+fname <- sprintf("data/indicators_all_res%s.geojson",RES)
+
+write(x=geojson_string, file=fname)
+```
+
