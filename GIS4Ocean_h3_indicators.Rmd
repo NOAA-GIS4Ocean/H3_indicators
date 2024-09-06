@@ -13,6 +13,43 @@ library(sf)
 library(arrow)
 library(magick)
 library(ggplot2)
+library(jsonlite)
+library(rgdal)
+```
+
+# Create a few helper functions
+
+## Create a function to download a new OBIS snapshot, if you don't have it already
+```{r function}
+
+download_obis_snapshot <- function() {
+  jsons <- data.frame(jsonlite::fromJSON("https://api.obis.org/export")$results)
+  
+  parquets <- dplyr::filter(jsons, type == "parquet")
+  
+  s3_path <- dplyr::filter(parquets, created == max(parquets$created))$s3path
+  
+  url_parquet = sprintf('https://obis-datasets.ams3.digitaloceanspaces.com/%s',
+                        s3_path)
+  dir_data <- here::here("~/GitProjects")
+  file_parquet <- file.path(dir_data, basename(url_parquet))
+  
+  stopifnot(dir.exists(dir_data))
+  
+  if (!file.exists(file_parquet)) {
+    print(sprintf(
+      "%s does not exist! Downloading from %s",
+      file_parquet,
+      url_parquet
+    ))
+    download.file(url_parquet, file_parquet, mode = "wb")
+  } else {
+    print(sprintf("%s already exists!", file_parquet))
+  }
+  
+  return(file_parquet)
+  
+}
 ```
 
 
@@ -47,14 +84,8 @@ h3_indicators <- function(occ, resolution = 9) {
 }
 ```
 
-# Lets do some work!
-
-## Get the OBIS records
-```{r }
+```{r function}
 # get OBIS records
-
-# obis_20230208.parquet downloaded from https://obis.org/data/access on 2023-02-08
-#   NOTE: .gitignore prevents this large file from being on Github
 
 open_parquet_file <- function(filepath){
   occ_all <- arrow::open_dataset(filepath)
@@ -70,9 +101,16 @@ open_parquet_file <- function(filepath){
     collect()
   # return occ  #I'm not sure what this line is supposed to be doing
 }
+```
 
+# Lets do some work!
 
-occ <- open_parquet_file("../obis_20230208.parquet")
+## Get the OBIS records
+```{r }
+
+file <- download_obis_snapshot()
+
+occ <- open_parquet_file(file)
     
 ```
 
@@ -80,7 +118,7 @@ occ <- open_parquet_file("../obis_20230208.parquet")
 ```{r}
 
 path <- "data/US_Waters_2024_WGS84/US_Waters_2024_WGS84.shp"
-tt <- read_sf(path) %>%
+tt <- read_sf(path, crs=4326) %>%
   st_transform(27572)
 ggplot() +
   geom_sf(data=tt)
@@ -130,7 +168,7 @@ Also, tell me how long it took to do this.
 ```{r}
 ptm <- proc.time()
 
-RES <- 1
+RES <- 2
 grid_dec <- h3_indicators(occ_in_poly, resolution=RES)
 
 proc.time() - ptm
