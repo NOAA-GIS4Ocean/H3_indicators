@@ -168,11 +168,17 @@ Also, tell me how long it took to do this.
 ```{r}
 ptm <- proc.time()
 
-RES <- 2
-grid_dec <- h3_indicators(occ_in_poly, resolution=RES)
+for (RES in 1:6) {
+  grid_dec <- h3_indicators(occ_in_poly, resolution = RES)
+  
+  geojson_string <- geojsonsf::sf_geojson(grid_dec)
 
-proc.time() - ptm
+  fname <- sprintf("data/indicators_all_res%s.geojson",RES)
 
+  write(x=geojson_string, file=fname)
+  
+  proc.time() - ptm
+}
 # RES 1
 #   user  system elapsed 
 #  22.32    0.06   22.45 
@@ -200,10 +206,10 @@ proc.time() - ptm
 
 # Write the data to geojson file
 ```{r}
-geojson_string <- geojsonsf::sf_geojson(grid_dec)
-
-fname <- sprintf("data/indicators_all_res%s.geojson",RES)
-
-write(x=geojson_string, file=fname)
+# geojson_string <- geojsonsf::sf_geojson(grid_dec)
+# 
+# fname <- sprintf("data/indicators_all_res%s.geojson",RES)
+# 
+# write(x=geojson_string, file=fname)
 ```
 
