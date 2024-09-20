@@ -7,7 +7,8 @@ The data sourced for this effort comes from the publicly available OBIS snapshot
 ## ❓ What's in this repo?
 
 * `GIS4Ocean_h3_indicators.Rmd` -
-   * downloads the most recent snapshot, grids the data to a determined [H3 grid resolution](https://h3geo.org/docs/core-library/restable/),
+   * downloads the most recent snapshot,
+   * grids the data to a determined [H3 grid resolution](https://h3geo.org/docs/core-library/restable/),
    * computes various indicators using the [`obisindicators`](https://marinebon.github.io/obisindicators/) R package,
    * saves the results to `.geojson` files in the `data/` directory.
 * `read_and_plot_geojson_heatmap.ipynb`
