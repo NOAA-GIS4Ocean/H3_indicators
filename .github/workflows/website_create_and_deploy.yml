@@ -27,6 +27,7 @@ jobs:
 
       - name: create HTML file
         run: |
+          micromamba activate H3_indicators
           cd website
           python create_indicator_webpages.py
 
