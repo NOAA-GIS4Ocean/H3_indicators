@@ -8,6 +8,7 @@ The data sourced for this effort comes from the publicly available OBIS snapshot
 
 * `GIS4Ocean_h3_indicators.Rmd` -
    * downloads the most recent snapshot,
+   * clips the data to US Waters as identified in the [shapefiles](https://github.com/NOAA-GIS4Ocean/H3_indicators/tree/main/data/US_Waters_2024_WGS84).
    * grids the data to a determined [H3 grid resolution](https://h3geo.org/docs/core-library/restable/),
    * computes various indicators using the [`obisindicators`](https://marinebon.github.io/obisindicators/) R package,
    * saves the results to `.geojson` files in the `data/` directory.
