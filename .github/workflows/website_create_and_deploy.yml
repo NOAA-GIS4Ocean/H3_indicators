@@ -1,0 +1,38 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Create and Deploy Prod HTML site
+# Includes building automatically when either of the relevant JSON files update on the main branch or on the push of a button
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/*.geojson'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Micromamba
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          init-shell: bash
+          environment-file: environment.yml
+
+      - name: create HTML file
+        run: |
+          cd website
+          python create_indicator_webpages.py
+
+      - name: Deploy 🚀
+        if: github.ref == 'refs/heads/main'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: website/deploy # The folder the action should deploy.
+          repository-name: MathewBiddle/H3_indicators

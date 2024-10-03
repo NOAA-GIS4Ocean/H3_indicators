@@ -1,0 +1,8 @@
+name: H3_indicators
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - geopandas>=0.13.2
+  - numpy
+  - pandas
