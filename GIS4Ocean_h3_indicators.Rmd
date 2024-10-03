@@ -31,20 +31,27 @@ download_obis_snapshot <- function() {
   
   url_parquet = sprintf('https://obis-datasets.ams3.digitaloceanspaces.com/%s',
                         s3_path)
+  
   dir_data <- here::here("~/GitProjects")
+  
   file_parquet <- file.path(dir_data, basename(url_parquet))
   
   stopifnot(dir.exists(dir_data))
   
   if (!file.exists(file_parquet)) {
+    
     print(sprintf(
       "%s does not exist! Downloading from %s",
       file_parquet,
       url_parquet
     ))
+    
     download.file(url_parquet, file_parquet, mode = "wb")
+    
   } else {
+    
     print(sprintf("%s already exists!", file_parquet))
+    
   }
   
   return(file_parquet)
@@ -57,18 +64,23 @@ download_obis_snapshot <- function() {
 
 ```{r function}
 h3_indicators <- function(occ, resolution = 9) {
+  
   ## Compute the indicator on the grid resolution of interest for the points in the identified polygons
   # return h3 cell index for occurrences in polygon
+  
   occ_h3 <- occ %>%
     mutate(cell = h3::geo_to_h3(data.frame(decimalLatitude, decimalLongitude), res = RES))
   
   # group by cell index and compute indicators
+  
   idx <- obisindicators::calc_indicators(occ_h3)
   
   # convert hexagon ids to spatial features
   # NOTE: DATELINEOFFSET is inv proportional to hex_res b/c we need to look
   #       further from the dateline as hex sizes get bigger.
+  
   dl_offset <- 60  # 60 is enough for hex_res >= 1. res 0 is weird; don't use it.
+  
   hex_sf <- purrr::map_df(idx$cell, h3::h3_to_geo_boundary_sf) %>%
     sf::st_wrap_dateline(c(
       "WRAPDATELINE=YES",
@@ -77,6 +89,7 @@ h3_indicators <- function(occ, resolution = 9) {
     dplyr::mutate(hexid = idx$cell)
   
   # merge geometry into indicator table
+  
   grid <- hex_sf %>%
     inner_join(idx, by = c("hexid" = "cell"))
   
@@ -84,22 +97,22 @@ h3_indicators <- function(occ, resolution = 9) {
 }
 ```
 
-```{r function}
-# get OBIS records
 
+# Function to get OBIS records from snapshot
+```{r function}
 open_parquet_file <- function(filepath){
+  
   occ_all <- arrow::open_dataset(filepath)
-  # NOTE: there are lots of other fields in the parquet file.
-  #     These could be used in the future.
+
   occ <- occ_all %>%
     group_by(
-      decimalLongitude, decimalLatitude, species, date_year) %>%  # remove duplicate rows
+      decimalLongitude, decimalLatitude, species) %>%  # remove duplicate rows, add date_year if testing.
     filter(!is.na(species))  %>%
     summarize(
       records = n(),
       .groups = "drop") %>%
     collect()
-  # return occ  #I'm not sure what this line is supposed to be doing
+
 }
 ```
 
@@ -116,14 +129,15 @@ occ <- open_parquet_file(file)
 
 # Identify US waters
 ```{r}
-
 path <- "data/US_Waters_2024_WGS84/US_Waters_2024_WGS84.shp"
+
 tt <- read_sf(path, crs=4326) %>%
   st_transform(27572)
-ggplot() +
-  geom_sf(data=tt)
+
+# ggplot() +
+#   geom_sf(data=tt)
 ```
-## Subset to generic "u.s. waters" box ti reduce amount of processing for next step 
+## Subset to generic "u.s. waters" box to reduce amount of processing for next step 
 If needed, reduce by date range too.
 
 ```{r}
@@ -131,13 +145,17 @@ If needed, reduce by date range too.
 # date_beg <- 1970
 # date_end <- date_beg+1
 # 
+# 
 occ_box <- occ %>%
-  filter(between(decimalLatitude,0.00,74.7)) %>%
-  filter(between(decimalLongitude,-180.0,-40.0) | between(decimalLongitude,160.0,180.0))  
+  filter(between(decimalLatitude,-20,80.0)) %>%
+  filter(between(decimalLongitude,-180.0,-20.0) | between(decimalLongitude,120.0,180.0))
+# 
+# Additional filtering for testing
 # %>%
 #   filter(
 #       date_year >= date_beg,
 #       date_year <= date_end)
+
 # occ_box <- occ
 ```
 
@@ -162,7 +180,7 @@ vect <- logi_point_in_pol %>%
 occ_in_poly <- occ_box[as.vector(vect$anyTRUE), ]
 ```
 
-## Create the indicators on h3 grids at specified resolution and return a dataframe
+## Create the indicators on H3 grids at specified resolution and write geojson files
 Also, tell me how long it took to do this.
 
 ```{r}
@@ -177,8 +195,10 @@ for (RES in 1:6) {
 
   write(x=geojson_string, file=fname)
   
-  proc.time() - ptm
+  #proc.time() - ptm
 }
+
+# Summary of approx compute times for each RES
 # RES 1
 #   user  system elapsed 
 #  22.32    0.06   22.45 
@@ -202,14 +222,5 @@ for (RES in 1:6) {
 # RES 6
 #    user  system elapsed 
 # 1139.92    3.69 1200.70 
-```
-
-# Write the data to geojson file
-```{r}
-# geojson_string <- geojsonsf::sf_geojson(grid_dec)
-# 
-# fname <- sprintf("data/indicators_all_res%s.geojson",RES)
-# 
-# write(x=geojson_string, file=fname)
 ```
 
