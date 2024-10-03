@@ -17,5 +17,7 @@ The data sourced for this effort comes from the publicly available OBIS snapshot
 
 Manually, the `.html` interactive maps are then served via GitHub Pages in the `gh-pages` branch. To view the interactive maps, browse to https://noaa-gis4ocean.github.io/H3_indicators/.
 
+Testing GH-Actions currently.
+
 ## 🖐️ Want to help out?
 * Check out our [CONTRIBUTING GUIDE](https://github.com/NOAA-GIS4Ocean/H3_indicators/blob/main/CONTRIBUTING.md) for more details.
