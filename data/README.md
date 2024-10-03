@@ -4,6 +4,8 @@ This directory contains biodiversity indicator files on an [H3 grid](https://h3g
 
 The indicators were developed using the R [obisindicators](https://github.com/marinebon/obisindicators) package.
 
+Indicators include: ES50,
+
 The source data are from the OBIS snapshot `obis_20240723.parquet`.
 
 The filename convention is as follows: indicators_all_res[resolution].geojson
