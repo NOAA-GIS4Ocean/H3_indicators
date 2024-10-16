@@ -36,4 +36,4 @@ jobs:
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: website/deploy # The folder the action should deploy.
-          repository-name: MathewBiddle/H3_indicators
+          repository-name: NOAA-GIS4Ocean/H3_indicators
