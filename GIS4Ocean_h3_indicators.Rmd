@@ -191,8 +191,14 @@ occ_in_poly <- occ_box[as.vector(vect$anyTRUE), ]
 #     collect()
 occ_year <- aggregate(occ_in_poly$records, by=list(date_year=occ_in_poly$date_year), FUN=sum)
 
+occ_year <- occ_year %>%
+  rename(occurrence_count = x,
+         year = date_year)
+
+write.csv(occ_year, "data/occurrence_by_year.csv", row.names=FALSE)
+
 p <- occ_year %>%
-  ggplot( aes(x=date_year, y=x)) + 
+  ggplot( aes(x=year, y=occurrence_count)) + 
   geom_col() #+
  # scale_y_log10() 
 
