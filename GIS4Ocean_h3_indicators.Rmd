@@ -106,7 +106,7 @@ open_parquet_file <- function(filepath){
 
   occ <- occ_all %>%
     group_by(
-      decimalLongitude, decimalLatitude, species) %>%  # remove duplicate rows, add date_year if testing.
+      decimalLongitude, decimalLatitude, species, date_year) %>%  # remove duplicate rows, add date_year if testing.
     filter(!is.na(species))  %>%
     summarize(
       records = n(),
@@ -179,6 +179,27 @@ vect <- logi_point_in_pol %>%
 
 occ_in_poly <- occ_box[as.vector(vect$anyTRUE), ]
 ```
+
+## Create a histogram of occurrences over the years
+
+```{r}
+occ_year <- aggregate(occ_in_poly$records, by=list(date_year=occ_in_poly$date_year), FUN=sum)
+
+occ_year <- occ_year %>%
+  rename(occurrence_count = x,
+         year = date_year)
+
+write.csv(occ_year, "data/occurrence_by_year.csv", row.names=FALSE)
+
+p <- occ_year %>%
+  ggplot( aes(x=year, y=occurrence_count)) + 
+  geom_col() #+
+ # scale_y_log10() 
+
+p
+```
+
+
 
 ## Create the indicators on H3 grids at specified resolution and write geojson files
 Also, tell me how long it took to do this.
