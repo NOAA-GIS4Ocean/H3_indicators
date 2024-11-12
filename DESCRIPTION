@@ -10,6 +10,10 @@ Authors@R:
       "Mathew", "Biddle", , "mathew.biddle@noaa.com", role = c("aut", "cre"),
       comment = c(ORCID = "0000-0003-4897-1669")
     ),
+    person(
+      "Laura", "Brenskelle", , "laura.brenskelle@noaa.gov", role = c("aut", "cre"),
+      comment = c(ORCID = "0000-0002-9284-8871")
+    ),
  )
 Description: Use data from the Ocean Biogeographic Information System to build marine biodiversity indicators for NOAA's GIS for the Ocean effort.
 License: MIT + file LICENSE
