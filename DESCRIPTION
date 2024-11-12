@@ -1,0 +1,42 @@
+Package: H3_indicators
+Title: Develop marine biodiversity indicators from OBIS data for NOAA GIS for the Ocean effort.
+Version: 0.1.0
+URL: https://noaa-gis4ocean.github.io/H3_indicators/,
+     https://github.com/NOAA-GIS4Ocean/H3_indicators
+BugReports: https://github.com/NOAA-GIS4Ocean/H3_indicators/issues
+Authors@R: 
+  c(
+    person(
+      "Mathew", "Biddle", , "mathew.biddle@noaa.com", role = c("aut", "cre"),
+      comment = c(ORCID = "0000-0003-4897-1669")
+    ),
+    person(
+      "Laura", "Brenskelle", , "laura.brenskelle@noaa.gov", role = c("aut", "cre"),
+      comment = c(ORCID = "0000-0002-9284-8871")
+    ),
+ )
+Description: Use data from the Ocean Biogeographic Information System to build marine biodiversity indicators for NOAA's GIS for the Ocean effort.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.0
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Depends: 
+    R (>= 4.1.1)
+LazyData: true
+Imports: 
+    dplyr,
+    ggplot2,
+    gsl,
+    h3,
+    jsonlite,
+    rgdal,
+    sf,
+Remotes: 
+    h3=crazycapivara/h3-r
+    obisindicators=marinebon/obisindicators
+Config/testthat/edition: 3
