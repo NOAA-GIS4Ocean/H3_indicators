@@ -1,0 +1,194 @@
+library(obisindicators)
+library(dplyr)
+library(h3)
+library(sf)
+library(arrow)
+library(magick)
+library(ggplot2)
+library(jsonlite)
+library(rgdal)
+
+# Create a few helper functions
+
+## Create a function to download a new OBIS snapshot, if you don't have it already
+
+download_obis_snapshot <- function() {
+  jsons <- data.frame(jsonlite::fromJSON("https://api.obis.org/export")$results)
+
+  parquets <- dplyr::filter(jsons, type == "parquet")
+
+  s3_path <- dplyr::filter(parquets, created == max(parquets$created))$s3path
+
+  url_parquet = sprintf('https://obis-datasets.ams3.digitaloceanspaces.com/%s',
+                        s3_path)
+
+  dir_data <- here::here("~/GitProjects")
+
+  file_parquet <- file.path(dir_data, basename(url_parquet))
+
+  stopifnot(dir.exists(dir_data))
+
+  if (!file.exists(file_parquet)) {
+
+    print(sprintf(
+      "%s does not exist! Downloading from %s",
+      file_parquet,
+      url_parquet
+    ))
+
+    download.file(url_parquet, file_parquet, mode = "wb")
+
+  } else {
+
+    print(sprintf("%s already exists!", file_parquet))
+
+  }
+
+  return(file_parquet)
+
+}
+
+
+## Create function to make grid, calculate metrics for different resolution grid sizes
+
+h3_indicators <- function(occ, resolution = 9) {
+
+  ## Compute the indicator on the grid resolution of interest for the points in the identified polygons
+  # return h3 cell index for occurrences in polygon
+
+  occ_h3 <- occ %>%
+    mutate(cell = h3::geo_to_h3(data.frame(decimalLatitude, decimalLongitude), res = RES))
+
+  # group by cell index and compute indicators
+
+  idx <- obisindicators::calc_indicators(occ_h3)
+
+  # convert hexagon ids to spatial features
+  # NOTE: DATELINEOFFSET is inv proportional to hex_res b/c we need to look
+  #       further from the dateline as hex sizes get bigger.
+
+  dl_offset <- 60  # 60 is enough for hex_res >= 1. res 0 is weird; don't use it.
+
+  hex_sf <- purrr::map_df(idx$cell, h3::h3_to_geo_boundary_sf) %>%
+    sf::st_wrap_dateline(c(
+      "WRAPDATELINE=YES",
+      glue::glue("DATELINEOFFSET={dl_offset}")
+    )) %>%
+    dplyr::mutate(hexid = idx$cell)
+
+  # merge geometry into indicator table
+
+  grid <- hex_sf %>%
+    inner_join(idx, by = c("hexid" = "cell"))
+
+  return(grid)
+}
+
+# Function to get OBIS records from snapshot
+
+open_parquet_file <- function(filepath){
+
+  occ_all <- arrow::open_dataset(filepath)
+
+  occ <- occ_all %>%
+    group_by(
+      decimalLongitude, decimalLatitude, species, date_year) %>%  # remove duplicate rows, add date_year if testing.
+    filter(!is.na(species))  %>%
+    summarize(
+      records = n(),
+      .groups = "drop") %>%
+    collect()
+
+}
+
+# Lets do some work!
+
+## Get the OBIS records
+
+file <- download_obis_snapshot()
+
+occ <- open_parquet_file(file)
+
+
+# Identify US waters
+path <- "data/US_Waters_2024_WGS84/US_Waters_2024_WGS84.shp"
+
+tt <- read_sf(path, crs=4326) %>%
+  st_transform(27572)
+
+# ggplot() +
+#   geom_sf(data=tt)
+
+## Subset to generic "u.s. waters" box to reduce amount of processing for next step
+## If needed, reduce by date range too.
+
+#
+# date_beg <- 1970
+# date_end <- date_beg+1
+#
+#
+occ_box <- occ %>%
+  filter(between(decimalLatitude,-20,80.0)) %>%
+  filter(between(decimalLongitude,-180.0,-20.0) | between(decimalLongitude,120.0,180.0))
+#
+# Additional filtering for testing
+# %>%
+#   filter(
+#       date_year >= date_beg,
+#       date_year <= date_end)
+
+# occ_box <- occ
+
+
+## Subset OBIS to US Waters
+# Take all of the points and only return points that exist in the polygons of interest.
+
+occ_sf <- sf::st_as_sf(occ_box,
+                       coords = c("decimalLongitude", "decimalLatitude"),
+                       crs = 4326) %>%
+  st_transform(27572)
+
+
+# test each point in each polygon (# pts by # polygons) TRUE = point is in polygon
+logi_point_in_pol <- as.data.frame(sf::st_intersects(occ_sf, tt, sparse = FALSE))
+
+
+vect <- logi_point_in_pol %>%
+  mutate(anyTRUE = if_any(.cols = contains('V')))
+
+occ_in_poly <- occ_box[as.vector(vect$anyTRUE), ]
+
+## Create a histogram of occurrences over the years
+
+occ_year <- aggregate(occ_in_poly$records, by=list(date_year=occ_in_poly$date_year), FUN=sum)
+
+occ_year <- occ_year %>%
+  rename(occurrence_count = x,
+         year = date_year)
+
+write.csv(occ_year, "data/occurrence_by_year.csv", row.names=FALSE)
+
+#p <- occ_year %>%
+#  ggplot( aes(x=year, y=occurrence_count)) +
+#  geom_col() #+
+ # scale_y_log10()
+
+#p
+
+
+
+## Create the indicators on H3 grids at specified resolution and write geojson files Also, tell me how long it took to do this.
+
+ptm <- proc.time()
+
+for (RES in 1:6) {
+  grid_dec <- h3_indicators(occ_in_poly, resolution = RES)
+
+  geojson_string <- geojsonsf::sf_geojson(grid_dec)
+
+  fname <- sprintf("data/indicators_all_res%s.geojson",RES)
+
+  write(x=geojson_string, file=fname)
+
+  #proc.time() - ptm
+}
