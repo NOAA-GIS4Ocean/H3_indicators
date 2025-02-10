@@ -6,3 +6,5 @@ dependencies:
   - geopandas>=0.13.2
   - numpy
   - pandas
+  - h3-py
+  - scipy
