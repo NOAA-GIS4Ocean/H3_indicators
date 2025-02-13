@@ -21,7 +21,7 @@ def download_obis_snapshot():
     s3_path = latest_parquet['s3path']
 
     url_parquet = f'https://obis-datasets.ams3.digitaloceanspaces.com/{s3_path}'
-    dir_data = os.path.expanduser("~\\Documents\\GitProjects")
+    dir_data = os.path.expanduser(".")
     file_parquet = os.path.join(dir_data, os.path.basename(url_parquet))
 
     if not os.path.exists(file_parquet):
