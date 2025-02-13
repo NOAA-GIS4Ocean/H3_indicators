@@ -3,6 +3,7 @@ import time
 import numpy as np
 import geopandas as gpd
 import h3
+import h3pandas
 import pandas as pd
 import requests
 from scipy.special import gammaln
@@ -36,9 +37,10 @@ def download_obis_snapshot():
 # Function to get OBIS records from snapshot
 def open_parquet_file(filepath):
     print(f'opening {filepath}')
-    df = pd.read_parquet(filepath, engine="fastparquet",
+    # filepath = "C:\\Users\\Mathew.Biddle\\Documents\\GitProjects\\obis_20241202.parquet"
+    df = pd.read_parquet(filepath, engine="pyarrow",
                          columns=['decimalLongitude', 'decimalLatitude', 'species', 'date_year'],
-                         filters=[('species','==','Carcharodon carcharias')],
+                         #filters=[('species','==','Carcharodon carcharias')], #smaller initial dataset
                          )
     # dataset = pq.ParquetDataset(filepath)
     # table = dataset.read()
@@ -52,7 +54,8 @@ def open_parquet_file(filepath):
 
 
 def calc_indicators(df, esn=50):
-    print(f'Calculating indicators')
+    print(f'Calculating indicators\n')
+    print(df.columns)
     # Check that 'df' is a DataFrame and 'esn' is numeric
     if not isinstance(df, pd.DataFrame):
         raise ValueError("df must be a pandas DataFrame")
@@ -88,7 +91,7 @@ def calc_indicators(df, esn=50):
         return np.nan
 
 
-    df_grouped['esi'] = df_grouped.apply(calculate_esi, axis=2)
+    df_grouped['esi'] = df_grouped.apply(calculate_esi, axis=1)
 
     # Group by 'cell' to summarize the final results
     final_results = df_grouped.groupby('cell', as_index=False).agg(
@@ -109,26 +112,30 @@ def calc_indicators(df, esn=50):
 
 
 # Function to calculate H3 indicators at a given resolution
-def h3_indicators(occ, resolution=9):
+def h3_indicators(occ, resolution=1):
     print('Convert to H3')
+    # import h3pandas #- https://h3-pandas.readthedocs.io/en/latest/notebook/00-intro.html
     # Convert points to H3 cells
-    occ['cell'] = occ.apply(lambda row: h3.geo_to_h3(row['decimalLatitude'], row['decimalLongitude'], resolution),
-                            axis=1)
+    # occ['cell'] = occ.apply(lambda row: h3.geo_to_h3(row['decimalLatitude'], row['decimalLongitude'], resolution),
+    #                         axis=1)
+
+    occ.rename(columns={'decimalLongitude':'lng','decimalLatitude':'lat'},inplace=True)
+    occ = occ.h3.geo_to_h3(resolution).reset_index().rename(columns={f'h3_0{resolution}':'cell'})
 
     # Group by H3 cell and aggregate records
-    grid = occ.groupby('cell').agg({'records': 'sum'}).reset_index()
+    gdf = occ.groupby(['cell','species']).agg({'records': 'sum'}).reset_index(['species']).h3.h3_to_geo_boundary().reset_index()
 
-    # Convert H3 cells to geometries
-    grid['geometry'] = grid['cell'].apply(lambda x: h3.h3_to_geo_boundary(x, geo_json=True))
+    # grid = occ.groupby('cell').agg({'records': 'sum'}).reset_index()
+
+    # # Convert H3 cells to geometries
+    # grid['geometry'] = grid['cell'].apply(lambda x: h3.h3_to_geo_boundary(x, geo_json=True))
 
     # Convert to GeoDataFrame
-    gdf = gpd.GeoDataFrame(grid, geometry='geometry')
+    #gdf = gpd.GeoDataFrame(grid, geometry='geometry')
     gdf.set_crs('EPSG:4326', allow_override=True, inplace=True)
 
     # group by cell index and compute indicators
     # idx < - obisindicators::calc_indicators(occ_h3)
-
-    gdf = calc_indicators(gdf, esn=50)
 
     return gdf
 
@@ -157,11 +164,18 @@ def subset2us_waters(occ,us_waters):
 
     print("Check if points are within US waters polygons")
     # occ_in_poly = occ_gdf[occ_gdf.geometry.within(us_waters.unary_union)]
-    occ_in_poly = occ_gdf[occ_gdf.geometry.within(us_waters)]# , align=False)]#.union_all(method="coverage"))]
 
-    return occ_in_poly
+    # Perform spatial join to match points and polygons
+    occ_in_poly = occ_gdf.overlay(us_waters,how='intersection')
+    #occ_in_poly = occ_gdf.clip(us_waters)
+    #occ_in_poly = gpd.tools.sjoin(occ_gdf, us_waters, predicate="within", how='left')
+
+    #occ_in_poly = occ_gdf[occ_gdf.geometry.within(us_waters.union_all(method="coverage"))]
+
+    return pd.DataFrame(occ_in_poly)
 
 
+start_time = time.time()
 # Main function to run the analysis
 #def run_analysis():
 # Download OBIS snapshot and load the records
@@ -170,6 +184,8 @@ occ = open_parquet_file(file)
 us_waters = load_us_waters()
 occ_in_poly = subset2us_waters(occ,us_waters)
 
+print(f"Organizing data processing time: {time.time() - start_time:.2f} seconds")
+
 # Create histogram of occurrences by year
 occ_year = occ_in_poly.groupby('date_year').size().reset_index(name='occurrence_count')
 occ_year.to_csv("temp/data/occurrence_by_year.csv", index=False)
@@ -177,8 +193,11 @@ occ_year.to_csv("temp/data/occurrence_by_year.csv", index=False)
 # Create H3 grid indicators for resolutions 1-6
 start_time = time.time()
 for resolution in range(1, 2):
-    grid_dec = h3_indicators(occ_in_poly, resolution=resolution)
+    
+    gdf = h3_indicators(occ_in_poly, resolution=resolution)
+    grid_dec = calc_indicators(gdf, esn=50).set_index("cell").h3.h3_to_geo()
 
+    grid_dec = gpd.GeoDataFrame(grid_dec.h3.h3_to_geo_boundary().reset_index())
     # Save results as GeoJSON
     geojson_string = grid_dec.to_json()
     fname = f"temp/data/indicators_all_res{resolution}.geojson"
