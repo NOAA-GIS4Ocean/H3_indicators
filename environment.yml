@@ -2,10 +2,15 @@ name: H3_indicators
 channels:
   - conda-forge
 dependencies:
-  - python=3.12
-  - geopandas>=0.13.2
-  - numpy
+  - geopandas[version='>=0.13.2']
   - pandas
-  - h3<4
-  - h3-py
-  - scipy
+  - python=3.12
+  - h3
+  - pyarrow
+  - h3-py=3.7.7
+  - geojson
+  - fastparquet
+  - ipykernel
+  - h3pandas
+  - dask
+  - dask-geopandas
