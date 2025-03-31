@@ -1,0 +1,33 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: H3_indicators
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Mathew
+    family-names: Biddle
+    orcid: 'https://orcid.org/0000-0003-4897-1669'
+  - given-names: Laura
+    family-names: Brenskelle
+    orcid: 'https://orcid.org/0000-0002-9284-8871'
+  - given-names: Mimi
+    orcid: 'https://orcid.org/0000-0002-4026-1390'
+    family-names: Diorio
+repository-code: 'https://github.com/NOAA-GIS4Ocean/H3_indicators/'
+url: 'https://noaa-gis4ocean.github.io/H3_indicators/'
+abstract: >-
+  Notebooks and documentation about computing H3
+  biodiversity indicators.
+keywords:
+  - H3
+  - biodiversity
+  - OBIS
+  - IOOS
+  - NMS
+license: CC0-1.0
+version: v0.5
+date-released: '2025-03-31'
