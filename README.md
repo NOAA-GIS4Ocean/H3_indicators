@@ -33,3 +33,6 @@ The maps are generated via [GitHub Action](https://github.com/NOAA-GIS4Ocean/H3_
 
 ## 🖐️ Want to help out?
 * Check out our [CONTRIBUTING GUIDE](https://github.com/NOAA-GIS4Ocean/H3_indicators/blob/main/CONTRIBUTING.md) for more details.
+
+## Repository citation
+[![DOI](https://zenodo.org/badge/852883236.svg)](https://doi.org/10.5281/zenodo.15113966)
